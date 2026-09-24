@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Class Attendance & Parent Alert System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F6FA;--surface:#FFFFFF;--ink:#17233A;--muted:#5B6B82;--line:#D9E1EC;
+  --accent:#2B5BA8;--accent-ink:#FFFFFF;
+  --present:#1E8A57;--present-bg:#E3F4EB;
+  --absent:#C4332A;--absent-bg:#FBE6E4;
+  --amber:#9A6200;--amber-bg:#FDF1D8;--amber-line:#E9B64A;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1726;--surface:#172238;--ink:#E6ECF5;--muted:#93A3BB;--line:#2A3853;
+    --accent:#7FA6E8;--accent-ink:#0F1726;
+    --present:#4CC38A;--present-bg:#133427;
+    --absent:#F2776D;--absent-bg:#3A1A1C;
+    --amber:#F0B44C;--amber-bg:#3A2C10;--amber-line:#8A6418;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1726;--surface:#172238;--ink:#E6ECF5;--muted:#93A3BB;--line:#2A3853;
+  --accent:#7FA6E8;--accent-ink:#0F1726;
+  --present:#4CC38A;--present-bg:#133427;
+  --absent:#F2776D;--absent-bg:#3A1A1C;
+  --amber:#F0B44C;--amber-bg:#3A2C10;--amber-line:#8A6418;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 120px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:16px;line-height:1.5}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+/* Header */
+header{background:var(--surface);border-bottom:1px solid var(--line)}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px 0 12px}
+.title{flex:1 1 260px}
+.title h1{margin:0;font-size:1.35rem;line-height:1.2}
+.title p{margin:2px 0 0;color:var(--muted);font-size:.9rem}
+.controls{display:flex;gap:8px;align-items:center}
+.date-field{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted)}
+.date-field input{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;color:var(--ink)}
+.icon-btn{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;cursor:pointer;align-self:flex-end}
+
+/* Tabs */
+nav{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+nav .tabs{display:flex;overflow-x:auto;gap:4px;padding:6px 0}
+nav button{flex:1 0 auto;border:0;background:transparent;padding:10px 12px;border-radius:8px;cursor:pointer;color:var(--muted);font-weight:700;white-space:nowrap}
+nav button[aria-selected="true"]{background:var(--bg);color:var(--ink);box-shadow:inset 0 -3px 0 var(--accent)}
+nav .count{display:inline-block;min-width:1.4em;margin-left:6px;padding:0 6px;border-radius:99px;background:var(--absent-bg);color:var(--absent);font-size:.8rem}
+
+main{padding:16px 0 120px}
+section[hidden]{display:none}
+h2{font-size:1.15rem;margin:4px 0 12px}
+.muted{color:var(--muted)}
+
+/* Banners */
+.banner{border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid var(--line);background:var(--surface)}
+.banner.locked{border-color:var(--present);background:var(--present-bg)}
+.banner.correction{border-color:var(--amber-line);background:var(--amber-bg)}
+.banner.sim{border:2px dashed var(--amber-line);background:var(--amber-bg)}
+.banner.sim strong{color:var(--amber)}
+.banner-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+
+/* Search */
+.search{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+
+/* Roll register */
+.register{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.register li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-top:1px solid var(--line);transition:background .15s}
+.register li:first-child{border-top:0}
+.register li.is-absent{background:var(--absent-bg)}
+.roll{width:2.4em;text-align:right;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.who{flex:1;min-width:0}
+.who .n{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who .m{font-size:.82rem;color:var(--muted)}
+.pa{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex-shrink:0}
+.pa button{border:0;background:transparent;width:48px;height:44px;font-weight:700;font-size:1.05rem;cursor:pointer;color:var(--muted)}
+.pa button[aria-pressed="true"].p{background:var(--present);color:#fff}
+.pa button[aria-pressed="true"].a{background:var(--absent);color:#fff}
+.pa button:disabled{cursor:not-allowed;opacity:.85}
+.register.locked .pa button[aria-pressed="false"]{opacity:.35}
+
+/* Bottom bar */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.bar .wrap{display:flex;align-items:center;gap:12px;padding-top:10px;padding-bottom:10px}
+.tally{flex:1;font-weight:700;font-variant-numeric:tabular-nums}
+.tally .g{color:var(--present)}.tally .r{color:var(--absent)}
+.btn{border:0;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Absentee list */
+.cards{display:grid;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--absent);border-radius:10px;padding:12px 14px}
+.card.hi{border-left-color:var(--amber-line)}
+.card .top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.leave{font-weight:700;color:var(--absent)}
+.card.hi .leave{color:var(--amber)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:24px;text-align:center;color:var(--muted)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+/* Message cards */
+.msg{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.msg .to{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.85rem;color:var(--muted);margin-bottom:8px}
+.bubble{background:var(--bg);border-radius:12px 12px 12px 2px;padding:10px 12px;max-width:62ch}
+.status{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:.85rem;padding:2px 10px;border-radius:99px}
+.status.Sent{background:var(--present-bg);color:var(--present)}
+.status.Failed{background:var(--absent-bg);color:var(--absent)}
+.status.Sending{background:var(--bg);color:var(--muted)}
+.msg .foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
+.link{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;padding:4px 0;text-decoration:underline}
+
+/* Tables */
+.tscroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:520px}
+th,td{text-align:left;padding:10px 12px;border-top:1px solid var(--line);vertical-align:middle}
+thead th{border-top:0;font-size:.85rem;color:var(--muted);background:var(--bg)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.hi td{background:var(--amber-bg)}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:.8rem;font-weight:700;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-line);margin-left:6px}
+.reason{width:100%;min-width:160px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:.9rem}
+.stat b{font-size:1.1rem}
+h3{font-size:1rem;margin:26px 0 10px}
+
+@media (max-width:520px){
+  .roll{width:1.8em}
+  .pa button{width:44px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap head">
+    <div class="title">
+      <h1>Class 12-A attendance</h1>
+      <p>Demo with 50 fictional students. All names and phone numbers are made up.</p>
+    </div>
+    <div class="controls">
+      <label class="date-field">Date
+        <input type="date" id="dateInput">
+      </label>
+      <button class="icon-btn" id="themeBtn" aria-label="Switch light or dark mode">◐</button>
+    </div>
+  </div>
+</header>
+
+<nav aria-label="Screens">
+  <div class="wrap tabs" role="tablist">
+    <button role="tab" data-tab="take" aria-selected="true">Take attendance</button>
+    <button role="tab" data-tab="absent" aria-selected="false">Absentees<span class="count" id="absCount" hidden></span></button>
+    <button role="tab" data-tab="alerts" aria-selected="false">Parent alerts</button>
+    <button role="tab" data-tab="month" aria-selected="false">Monthly overview</button>
+  </div>
+</nav>
+
+<main class="wrap">
+  <!-- SCREEN 1 -->
+  <section id="tab-take">
+    <div id="lockBanner"></div>
+    <input class="search" id="search" type="search" placeholder="Find by name or roll number" aria-label="Find student">
+    <ul class="register" id="register"></ul>
+  </section>
+
+  <!-- SCREEN 2 -->
+  <section id="tab-absent" hidden>
+    <h2 id="absTitle">Absent today</h2>
+    <div id="absBody"></div>
+  </section>
+
+  <!-- SCREEN 3 -->
+  <section id="tab-alerts" hidden>
+    <div class="banner sim" role="note" id="modeBanner"></div>
+    <details class="banner" id="livePanel">
+      <summary><strong>WhatsApp sending settings</strong></summary>
+      <div style="display:grid;gap:10px;margin-top:10px">
+        <label><input type="checkbox" id="liveToggle"> Send real WhatsApp messages (needs the site deployed with the send-alert function)</label>
+        <label class="date-field">Send every alert to this test number instead (10 digits, must be a verified recipient in Meta)
+          <input id="testTo" inputmode="numeric" maxlength="10" placeholder="e.g. your own number"></label>
+        <label class="date-field">Passcode (if you set ALERT_PASSCODE in Netlify)
+          <input id="passcode" type="password"></label>
+      </div>
+    </details>
+    <h2 id="alertTitle">Parent alerts</h2>
+    <div id="alertBody"></div>
+  </section>
+
+  <!-- SCREEN 4 -->
+  <section id="tab-month" hidden>
+    <h2 id="monthTitle">Monthly overview</h2>
+    <div class="stats" id="monthStats"></div>
+    <div class="toolbar">
+      <label><input type="checkbox" id="onlyHi"> Show only students with 3+ absences</label>
+    </div>
+    <div class="tscroll"><table>
+      <thead><tr><th class="num">Roll</th><th>Student</th><th class="num">Absences this month</th><th class="num">Attendance</th></tr></thead>
+      <tbody id="monthBody"></tbody>
+    </table></div>
+
+    <h3>Alert log</h3>
+    <p class="muted" style="margin-top:-4px">Every simulated message sent this session. Add the reason once the parent replies.</p>
+    <div class="tscroll"><table>
+      <thead><tr><th>Date</th><th>Student</th><th>Parent phone</th><th class="num">Leave no.</th><th>Status</th><th>Reason for absence</th></tr></thead>
+      <tbody id="logBody"></tbody>
+    </table></div>
+  </section>
+</main>
+
+<div class="bar" id="bar">
+  <div class="wrap">
+    <div class="tally" id="tally"></div>
+    <button class="btn" id="submitBtn">Submit attendance</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   DATA — all fictional. Kept in memory for this session only.
+   ========================================================= */
+const CLASS_NAME = "12-A";
+
+// Seeded random so the demo data is the same every load
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rand = mulberry32(1224);
+
+const FIRST = ["Aarav","Diya","Ishaan","Myra","Kabir","Anaya","Vihaan","Saanvi","Reyansh","Kiara","Arjun","Tara","Neil","Avni","Rohan","Meher","Aditi","Yash","Zoya","Dhruv","Riya","Vivaan","Ira","Parth","Nisha","Samar","Pihu","Kunal","Leela","Om","Sia","Aryan","Naina","Dev","Prisha","Rudra","Esha","Karan","Anvi","Manav","Trisha","Arnav","Jiya","Siddh","Mira","Veer","Aisha","Nakul","Rhea","Tanay"];
+const LAST = ["Kulkarni","Iyer","Deshpande","Rao","Bhatt","Menon","Joshi","Nair","Chawla","Pillai","Sethi","Banerjee","Gokhale","Dutta","Kapadia","Rathod","Varma","Shetty","Mathur","Saxena","Sinha","Tiwari","Kamat","Ghosh","Parekh"];
+
+const students = FIRST.map((f,i)=>({
+  name: f+" "+LAST[Math.floor(rand()*LAST.length)],
+  phone: ""
+})).sort((a,b)=>a.name.localeCompare(b.name))
+  .map((s,i)=>({roll:i+1, name:s.name, phone:"9000000"+String(i+101).padStart(3,"0")})); // clearly fake: 9000000101…9000000150
+
+// Date helpers (local time, YYYY-MM-DD)
+const iso = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const parse = s => {const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const pretty = s => parse(s).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
+const monthName = s => parse(s).toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+const ordinal = n => {const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])};
+const esc = t => String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* State: records[date] = { absent:Set<roll>, submitted, editing, corrected } */
+const state = {
+  date: iso(new Date()),
+  tab: "take",
+  records: {},
+  log: [],       // { id, date, roll, name, phone, leaveNo, status, reason, text }
+  nextId: 1,
+  live: false, testTo: "", passcode: ""
+};
+
+// Pre-load ~15 past school days (Mon–Sat) of realistic history
+(function seedHistory(){
+  const chronic = new Set([7,19,23,34,46]);   // a handful with repeated absences
+  const d = parse(state.date); let added = 0;
+  while(added < 15){
+    d.setDate(d.getDate()-1);
+    if(d.getDay()===0) continue;               // skip Sundays
+    const absent = new Set();
+    students.forEach(s=>{ if(rand() < (chronic.has(s.roll)?0.28:0.035)) absent.add(s.roll) });
+    state.records[iso(d)] = {absent, submitted:true, editing:false, corrected:false};
+    added++;
+  }
+})();
+
+function rec(date=state.date){
+  if(!state.records[date]) state.records[date] = {absent:new Set(), submitted:false, editing:false, corrected:false};
+  return state.records[date];
+}
+const isLocked = r => r.submitted && !r.editing;
+
+// Absences for a student in the month of `date`, counting submitted days up to and including `date`
+function absencesThisMonth(roll, date=state.date){
+  const m = date.slice(0,7); let n = 0;
+  for(const [k,r] of Object.entries(state.records)){
+    if(k.slice(0,7)===m && k<=date && r.submitted && r.absent.has(roll)) n++;
+  }
+  return n;
+}
+function schoolDaysThisMonth(date=state.date){
+  const m = date.slice(0,7);
+  return Object.entries(state.records).filter(([k,r])=>k.slice(0,7)===m && k<=date && r.submitted).length;
+}
+
+/* =========================================================
+   MESSAGE SENDING — SIMULATED
+   ========================================================= */
+function buildMessage(s, date, leaveNo){
+  return `Dear Parent, your child ${s.name} (Roll No. ${s.roll}, Class ${CLASS_NAME}) was absent from school today, ${pretty(date)}. This is their ${ordinal(leaveNo)} leave this month. Kindly inform the class teacher of the reason for absence.`;
+}
+
+async function sendParentMessage(e){
+  // SIMULATED MODE (default): fake delay + random status (~90% Sent)
+  if(!state.live){
+    await new Promise(r=>setTimeout(r, 300 + Math.random()*500));
+    return Math.random() < 0.9 ? "Sent" : "Failed";
+  }
+  /* LIVE MODE: calls our own Netlify function (netlify/functions/send-alert.js),
+     which holds the WhatsApp token and calls Meta's WhatsApp Cloud API.
+     The token is never in this page. */
+  try{
+    const res = await fetch("/.netlify/functions/send-alert", {
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-alert-passcode":state.passcode},
+      body: JSON.stringify({
+        phone: state.testTo || e.phone,   // test override while using Meta's test number
+        name: e.name, roll: String(e.roll), date: pretty(e.date), leave: ordinal(e.leaveNo)
+      })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) console.warn("Send failed:", data.error);
+    e.error = res.ok ? "" : (data.error || "HTTP "+res.status);
+    return res.ok ? "Sent" : "Failed";
+  }catch(err){ e.error = String(err); return "Failed"; }
+}
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+const $ = id => document.getElementById(id);
+
+function renderAll(){
+  renderTake(); renderAbsent(); renderAlerts(); renderMonth(); renderBar(); renderTabs();
+}
+
+function renderTabs(){
+  document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===state.tab));
+  ["take","absent","alerts","month"].forEach(t=>$("tab-"+t).hidden = t!==state.tab);
+  $("bar").hidden = state.tab!=="take";
+  const r = rec(), n = r.absent.size;
+  $("absCount").hidden = !(r.submitted && n); $("absCount").textContent = n;
+}
+
+function renderTake(){
+  const r = rec(), locked = isLocked(r);
+  let b = "";
+  if(locked){
+    b = `<div class="banner locked"><div class="banner-row">
+      <span><strong>Submitted for ${pretty(state.date)}.</strong> ${r.corrected?"Includes a correction. ":""}The list is locked.</span>
+      <button class="btn warn" id="editBtn">Edit (correction)</button></div></div>`;
+  } else if(r.editing){
+    b = `<div class="banner correction"><strong>Correction mode.</strong> You're changing attendance that was already submitted for ${pretty(state.date)}. Resubmit to save the correction.</div>`;
+  } else {
+    b = `<div class="banner"><strong>${pretty(state.date)}</strong>, Class ${CLASS_NAME}. Everyone starts as present. Tap A for each absent student.</div>`;
+  }
+  $("lockBanner").innerHTML = b;
+  const eb = $("editBtn"); if(eb) eb.onclick = ()=>{ r.editing = true; renderAll(); };
+
+  const q = $("search").value.trim().toLowerCase();
+  const list = $("register");
+  list.className = "register" + (locked?" locked":"");
+  list.innerHTML = students.map(s=>{
+    const ab = r.absent.has(s.roll);
+    const hide = q && !(s.name.toLowerCase().includes(q) || String(s.roll)===q || String(s.roll).startsWith(q));
+    return `<li class="${ab?"is-absent":""}" ${hide?"hidden":""}>
+      <span class="roll">${s.roll}</span>
+      <div class="who"><div class="n">${esc(s.name)}</div><div class="m">Parent ${s.phone}</div></div>
+      <div class="pa" role="group" aria-label="Attendance for ${esc(s.name)}">
+        <button class="p" data-roll="${s.roll}" data-v="P" aria-pressed="${!ab}" ${locked?"disabled":""} aria-label="Present">P</button>
+        <button class="a" data-roll="${s.roll}" data-v="A" aria-pressed="${ab}" ${locked?"disabled":""} aria-label="Absent">A</button>
+      </div></li>`;
+  }).join("");
+}
+
+function renderBar(){
+  const r = rec(), a = r.absent.size;
+  $("tally").innerHTML = `<span class="g">Present: ${students.length-a}</span> | <span class="r">Absent: ${a}</span>`;
+  const btn = $("submitBtn");
+  btn.hidden = isLocked(r);
+  btn.textContent = r.editing ? "Resubmit correction" : "Submit attendance";
+}
+
+function renderAbsent(){
+  const r = rec();
+  $("absTitle").textContent = "Absent on " + pretty(state.date);
+  if(!r.submitted){
+    $("absBody").innerHTML = `<div class="empty">Submit attendance for this date to see who's absent.<div class="actions" style="justify-content:center"><button class="btn" data-go="take">Take attendance</button></div></div>`;
+    return;
+  }
+  const abs = students.filter(s=>r.absent.has(s.roll));
+  if(!abs.length){ $("absBody").innerHTML = `<div class="empty">Full attendance. No parents to notify.</div>`; return; }
+  const pending = abs.filter(s=>!state.log.some(l=>l.date===state.date && l.roll===s.roll)).length;
+  $("absBody").innerHTML = `<div class="cards">` + abs.map(s=>{
+    const n = absencesThisMonth(s.roll);
+    return `<div class="card ${n>=3?"hi":""}"><div class="top">
+      <div><strong>${esc(s.name)}</strong> <span class="muted">Roll No. ${s.roll}</span></div>
+      <div class="leave">This is leave number ${n} this month${n>=3?'<span class="pill">3+</span>':""}</div>
+    </div></div>`;
+  }).join("") + `</div>
+  <div class="actions">
+    <button class="btn" id="notifyBtn" ${pending?"":"disabled"}>${pending?`Notify parents (${pending})`:"All parents notified"}</button>
+    ${pending<abs.length?'<button class="btn ghost" data-go="alerts">View sent alerts</button>':""}
+  </div>`;
+  $("notifyBtn").onclick = notifyParents;
+}
+
+function renderAlerts(){
+  $("alertTitle").textContent = "Parent alerts for " + pretty(state.date);
+  const items = state.log.filter(l=>l.date===state.date);
+  if(!items.length){
+    $("alertBody").innerHTML = `<div class="empty">No alerts sent for this date yet. Submit attendance, then use Notify parents on the Absentees screen.<div class="actions" style="justify-content:center"><button class="btn" data-go="absent">Go to absentees</button></div></div>`;
+    return;
+  }
+  $("alertBody").innerHTML = `<div class="cards">` + items.map(l=>`
+    <div class="msg">
+      <div class="to"><span>To parent of <strong>${esc(l.name)}</strong> at ${l.phone}</span><span>${ordinal(l.leaveNo)} leave this month</span></div>
+      <div class="bubble">${esc(l.text)}</div>
+      <div class="foot">
+        <span class="status ${l.status}">${l.status==="Sending"?"Sending…":l.status} <span class="muted" style="font-weight:400">(${l.mode})</span></span>${l.error?`<span class="muted" style="font-size:.8rem">${esc(l.error)}</span>`:""}
+        ${l.status==="Failed"?`<button class="link" data-retry="${l.id}">Retry</button>`:""}
+      </div>
+    </div>`).join("") + `</div>
+    <div class="actions"><button class="btn ghost" data-go="month">Open alert log</button></div>`;
+}
+
+function renderMonth(){
+  const m = monthName(state.date), days = schoolDaysThisMonth();
+  $("monthTitle").textContent = "Monthly overview, " + m;
+  const rows = students.map(s=>({s, n:absencesThisMonth(s.roll)}));
+  const hi = rows.filter(x=>x.n>=3).length;
+  const total = rows.reduce((a,x)=>a+x.n,0);
+  $("monthStats").innerHTML = `
+    <div class="stat"><b>${days}</b> school days recorded up to ${pretty(state.date)}</div>
+    <div class="stat"><b>${total}</b> absences in total</div>
+    <div class="stat" style="border-color:var(--amber-line);background:var(--amber-bg)"><b style="color:var(--amber)">${hi}</b> students with 3+ absences</div>`;
+  const only = $("onlyHi").checked;
+  $("monthBody").innerHTML = rows.filter(x=>!only||x.n>=3).map(({s,n})=>{
+    const pct = days ? Math.round((days-n)/days*100) : 100;
+    return `<tr class="${n>=3?"hi":""}"><td class="num">${s.roll}</td><td>${esc(s.name)}${n>=3?'<span class="pill">3+</span>':""}</td>
+      <td class="num" style="color:${n>=3?"var(--amber)":n?"var(--absent)":"var(--present)"};font-weight:700">${n}</td><td class="num">${pct}%</td></tr>`;
+  }).join("") || `<tr><td colspan="4" class="muted">No students with 3+ absences this month.</td></tr>`;
+
+  const log = [...state.log].sort((a,b)=>b.date.localeCompare(a.date)||a.roll-b.roll);
+  $("logBody").innerHTML = log.length ? log.map(l=>`
+    <tr><td>${pretty(l.date)}</td><td>${esc(l.name)} <span class="muted">(${l.roll})</span></td><td>${l.phone}</td>
+    <td class="num">${l.leaveNo}</td><td><span class="status ${l.status}">${l.status==="Sending"?"Sending…":l.status}</span></td>
+    <td><input class="reason" data-reason="${l.id}" value="${esc(l.reason)}" placeholder="e.g. Fever, family function" aria-label="Reason for ${esc(l.name)}"></td></tr>`).join("")
+    : `<tr><td colspan="6" class="muted">No alerts sent yet this session.</td></tr>`;
+}
+
+/* =========================================================
+   ACTIONS
+   ========================================================= */
+async function notifyParents(){
+  const r = rec(), date = state.date;
+  const todo = students.filter(s=>r.absent.has(s.roll) && !state.log.some(l=>l.date===date && l.roll===s.roll));
+  const entries = todo.map(s=>{
+    const leaveNo = absencesThisMonth(s.roll, date);
+    const e = {id:state.nextId++, date, roll:s.roll, name:s.name, phone:s.phone, leaveNo,
+               status:"Sending", reason:"", mode: state.live?"live":"simulated", text:buildMessage(s, date, leaveNo)};
+    state.log.push(e); return e;
+  });
+  state.tab = "alerts"; renderAll(); window.scrollTo(0,0);
+  for(const e of entries){ e.status = await sendParentMessage(e); renderAlerts(); renderMonth(); }
+  renderAbsent();
+}
+
+async function retry(id){
+  const e = state.log.find(l=>l.id===id); if(!e) return; e.mode = state.live?"live":"simulated";
+  e.status = "Sending"; renderAlerts();
+  e.status = await sendParentMessage(e);
+  renderAlerts(); renderMonth();
+}
+
+document.addEventListener("click", e=>{
+  const t = e.target.closest("button"); if(!t) return;
+  if(t.dataset.tab || t.dataset.go){ state.tab = t.dataset.tab || t.dataset.go; renderAll(); window.scrollTo(0,0); return; }
+  if(t.dataset.retry){ retry(Number(t.dataset.retry)); return; }
+  if(t.dataset.roll){
+    const r = rec(); if(isLocked(r)) return;
+    const roll = Number(t.dataset.roll);
+    t.dataset.v==="A" ? r.absent.add(roll) : r.absent.delete(roll);
+    const li = t.closest("li");
+    li.classList.toggle("is-absent", r.absent.has(roll));
+    li.querySelector(".p").setAttribute("aria-pressed", !r.absent.has(roll));
+    li.querySelector(".a").setAttribute("aria-pressed", r.absent.has(roll));
+    renderBar();
+  }
+});
+
+$("submitBtn").onclick = ()=>{
+  const r = rec();
+  if(r.editing){ r.corrected = true; r.editing = false; }
+  r.submitted = true;
+  $("search").value = "";
+  state.tab = "absent"; renderAll(); window.scrollTo(0,0);
+};
+
+$("search").oninput = renderTake;
+$("onlyHi").onchange = renderMonth;
+$("logBody").addEventListener("input", e=>{
+  const id = e.target.dataset.reason; if(!id) return;
+  const l = state.log.find(x=>x.id===Number(id)); if(l) l.reason = e.target.value;
+});
+
+$("dateInput").value = state.date;
+$("dateInput").onchange = e=>{ if(e.target.value){ state.date = e.target.value; renderAll(); } };
+
+$("themeBtn").onclick = ()=>{
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+};
+
+function renderMode(){
+  $("modeBanner").innerHTML = state.live
+    ? `<strong>LIVE — real WhatsApp messages will be sent.</strong> ${state.testTo?`All alerts go to test number ${esc(state.testTo)}.`:"Alerts go to each parent's number."}`
+    : `<strong>SIMULATED — no real SMS/WhatsApp is sent.</strong> Turn on live sending in the settings below once the site is deployed with the send-alert function.`;
+}
+$("liveToggle").onchange = e=>{ state.live = e.target.checked; renderMode(); };
+$("testTo").oninput = e=>{ state.testTo = e.target.value.replace(/\D/g,"").slice(0,10); renderMode(); };
+$("passcode").oninput = e=>{ state.passcode = e.target.value; };
+renderMode();
+renderAll();
+</script>
+</body>
+</html>
